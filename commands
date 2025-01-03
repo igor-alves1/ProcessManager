@@ -1,0 +1,5 @@
+Compilação:
+gcc $(pkg-config --cflags gtk4) -lpthread -o app main.c os.c fila.c TLSE.c $(pkg-config --libs gtk4)
+
+Execução:
+./app
