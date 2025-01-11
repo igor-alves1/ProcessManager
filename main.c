@@ -150,37 +150,31 @@ void *thread_LongoPrazo(void *arg){
 
   int i = 0;
   while(data->app){
-    printf("Rodando esta thread concorrentemente\n");
-    sleep(1);
+    if(memoriaDisponivel(so)){
+      sem_wait(so->s_empty_novos);
+      sem_wait(so->s_mutex_novos);
+      escalonadorLongoPrazo(so);
+      sem_post(so->s_mutex_novos);
+    }
   }
   pthread_exit(NULL);
 }
 
-//Consome da fila de Prontos e produz para o array de CPUs
-void *thread_CurtoPrazo(void *arg){
+//Consome da fila de Prontos e executa Processos
+void *thread_execucao(void *arg){
   AppData *data = (AppData *) arg;
   SO *so = data->so;
 
+  sleep(5);
   while(data->app){
-
+    sleep(3);
+    clockSO(so);
   }
   pthread_exit(NULL);
 }
-
-//Consome (executa) o array de CPUs
-void *thread_CPU(void *arg){
-  AppData *data = (AppData *) arg;
-  SO *so = data->so;
-
-  while(data->app){
-
-  }
-  pthread_exit(NULL);
-}
-
 
 int main (int argc, char **argv){
-  pthread_t thread_ui, thread_longterm, thread_shortterm, thread_cpu;
+  pthread_t thread_ui, thread_longterm, thread_cpu;
   void *status, *thread_exec;
 
   AppData *data = malloc(sizeof(AppData));
@@ -189,13 +183,10 @@ int main (int argc, char **argv){
 
   pthread_create(&thread_ui, NULL, thread_UI, data);
   pthread_create(&thread_longterm, NULL, thread_LongoPrazo, data);
-  pthread_create(&thread_longterm, NULL, thread_LongoPrazo, data);
-  pthread_create(&thread_shortterm, NULL, thread_CurtoPrazo, data);
-  pthread_create(&thread_cpu, NULL, thread_CPU, data);
+  pthread_create(&thread_cpu, NULL, thread_execucao, data);
 
   pthread_join(thread_ui, &status);
   pthread_join(thread_longterm, &thread_exec);
-  pthread_join(thread_shortterm, &thread_exec);
   pthread_join(thread_cpu, &thread_exec);
 
   int *stat = (int *)status;

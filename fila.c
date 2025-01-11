@@ -26,8 +26,11 @@ void addFila(Fila *f, void *dado){
 void *removeFila(Fila *f){
     if(filaVazia(f)) return NULL;
     Lista *tmp = f->first;
+    void *dado = tmp->dado;
     f->first = f->first->prox;
-    return tmp->dado;
+    if(!f->first) f->last = NULL;
+    free(tmp);
+    return dado;
 }
 
 void *peek(Fila *f){

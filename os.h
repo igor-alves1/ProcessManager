@@ -34,4 +34,5 @@ typedef struct OS {
 SO *inicializarSO();
 Processo *criarProcesso(int tam, int fase1, int faseIO, int fase2);
 void escalonadorLongoPrazo(SO *so);
-void escalonadorCurtoPrazo(SO *so, CPU *cpu);
+int memoriaDisponivel(SO *so);
+void clockSO(SO *so);
