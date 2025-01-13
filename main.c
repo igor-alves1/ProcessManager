@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <gtk/gtk.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include "os.h"
 #include "fila.h"
 #include "TLSE.h"
@@ -39,6 +38,7 @@ int str_to_int(const char *str){
   return result;
 }
 
+
 static void on_submit_button_clicked(GtkButton *button, gpointer user_data) {
 
   SubmitData *submit_data = (SubmitData *)user_data;
@@ -66,10 +66,8 @@ static void on_submit_button_clicked(GtkButton *button, gpointer user_data) {
   Processo *p = criarProcesso(tam, cpu1, io, cpu2);
 
   // Acesso à região crítica da fila de Novos
-  sem_wait(app_data->so->s_mutex_novos);
   addFila(app_data->so->novos, p);
-  sem_post(app_data->so->s_mutex_novos);
-  sem_post(app_data->so->s_empty_novos);
+  app_data->so->interrupt = 1;
 
   g_print("#########################\nNovo processo criado!\n");
   g_print("Tamanho (MB): %d\n", tam);
@@ -78,11 +76,28 @@ static void on_submit_button_clicked(GtkButton *button, gpointer user_data) {
   g_print("Fase 2 (CPU): %d\n#########################\n", cpu2);
 }
 
+
+void printProcessBanner() {
+    // Cada linha termina com \n e precisa manter a mesma formatação
+    // do ASCII que você forneceu.
+    printf("______                                     ___  ___                                        \n");
+    printf("| ___ \\                                    |  \\/  |                                        \n");
+    printf("| |_/ / _ __   ___    ___   ___  ___  ___  | .  . |  __ _  _ __    __ _   __ _   ___  _ __ \n");
+    printf("|  __/ | '__| / _ \\  / __| / _ \\/ __|/ __| | |\\/| | / _` || '_ \\  / _` | / _` | / _ \\| '__|\n");
+    printf("| |    | |   | (_) || (__ |  __/\\__ \\\\__ \\ | |  | || (_| || | | || (_| || (_| ||  __/| |   \n");
+    printf("\\_|    |_|    \\___/  \\___| \\___||___/|___/ \\_|  |_/ \\__,_||_| |_| \\__,_| \\__, | \\___||_|   \n");
+    printf("                                                                          __/ |               \n");
+    printf("                                                                         |___/                \n");
+}
+
 // Função do botão para execução passo a passo
 static void on_step_button_clicked(GtkButton *button, gpointer user_data){
+  system("clear");
+  printProcessBanner();                                                             
   pthread_mutex_lock(&step_mutex);
   pthread_cond_signal(&step_cond);
   pthread_mutex_unlock(&step_mutex);
+  
 }
 
 void on_checkbutton_toggled(GtkToggleButton *button, gpointer data) {
@@ -182,11 +197,15 @@ void *thread_LongoPrazo(void *arg){
 
   int i = 0;
   while(data->app){
-    if(memoriaDisponivel(so)){
-      sem_wait(so->s_empty_novos);
-      sem_wait(so->s_mutex_novos);
+    while(!so->interrupt);
+    so->interrupt = 0;
+    if(filaVazia(so->novos)) continue;
+    int x = memoriaDisponivel(so);
+    if (x) {
+      printf("Memoria disponivel, alocando processo...\n");
       escalonadorLongoPrazo(so);
-      sem_post(so->s_mutex_novos);
+    } else{
+      printf("Memória indisponível, aguardando...\n");
     }
   }
   pthread_exit(NULL);

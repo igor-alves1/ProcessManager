@@ -6,11 +6,15 @@
 #include "fila.h"
 
 #define QUANTUM 4
+#define MEM_SIZE 32768 // tam do array da MP em MB
+#define ARRAY_SIZE MEM_SIZE/8
+#define PAGE_SIZE 1 // tam da pag em MB
 
 typedef struct Process {
     int id;
     int fase1, faseIO, fase2;
     int tamMB;
+    int *end_mp;
 } Processo;
 
 typedef struct cpu {
@@ -24,11 +28,12 @@ typedef struct OS {
     Fila *prontos_aux;
     Fila *bloqueados;
     Fila *novos;
-    Lista *RAM;
     sem_t *s_empty_novos;
     sem_t *s_mutex_novos;
-    sem_t *s_empty_prontos;
-    sem_t *s_mutex_prontos;
+    u_int8_t *RAM;
+    int num_processos;
+    int interrupt;
+    
 } SO;
 
 SO *inicializarSO();
