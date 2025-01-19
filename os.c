@@ -3,6 +3,9 @@
 #include "fila.h"
 #include "os.h"
 
+
+
+
 void printProcessBanner() {
     // Cada linha termina com \n e precisa manter a mesma formatação
     // do ASCII que você forneceu.
@@ -131,6 +134,8 @@ void escalonadorLongoPrazo(SO *so){
         }
     }
     admitirProcesso(so);
+
+
 }
 
 

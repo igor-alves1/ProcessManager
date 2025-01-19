@@ -11,7 +11,10 @@
 // Mutex e Condicional para execução passo a passo
 pthread_mutex_t step_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t step_cond = PTHREAD_COND_INITIALIZER;
+
 int isStep = 1;
+
+
 
 typedef struct appdata{
   SO *so;
@@ -48,7 +51,10 @@ void print_byte(u_int8_t b){
 void printMemoria(u_int8_t *arr){
     for(int i = 0; i<ARRAY_SIZE/4; i++)
         print_byte(arr[i]);
+    printf("\n");
 }
+
+
 
 
 static void on_submit_button_clicked(GtkButton *button, gpointer user_data) {
@@ -81,11 +87,11 @@ static void on_submit_button_clicked(GtkButton *button, gpointer user_data) {
   addFila(app_data->so->novos, p);
   app_data->so->interrupt = 1;
 
-  g_print("#########################\nNovo processo criado!\n");
-  g_print("Tamanho (MB): %d\n", tam);
-  g_print("Fase 1 (CPU): %d\n", cpu1);
-  g_print("Fase de I/O: %d\n", io);
-  g_print("Fase 2 (CPU): %d\n#########################\n", cpu2);
+  printf("#########################\nNovo processo criado!\n");
+  printf("Tamanho (MB): %d\n", tam);
+  printf("Fase 1 (CPU): %d\n", cpu1);
+  printf("Fase de I/O: %d\n", io);
+  printf("Fase 2 (CPU): %d\n#########################\n", cpu2);
 }
 
 
@@ -111,11 +117,11 @@ void on_checkbutton_toggled(GtkToggleButton *button, gpointer data) {
 }
 
 static void on_show_memory_button_clicked(GtkButton *button, gpointer user_data){
-  AppData *appData = (AppData*)user_data;
-  SO* so = appData->so;
-  pthread_mutex_lock(&step_mutex);
-  printMemoria(so->RAM);
-  pthread_mutex_unlock(&step_mutex);
+    AppData *appData = (AppData*)user_data;
+    SO* so = appData->so;
+    pthread_mutex_lock(&step_mutex);
+    printMemoria(so->RAM);
+    pthread_mutex_unlock(&step_mutex);
 
 }
 
