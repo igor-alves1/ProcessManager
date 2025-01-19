@@ -38,6 +38,18 @@ int str_to_int(const char *str){
   return result;
 }
 
+void print_byte(u_int8_t b){
+  for (int i=7;i >= 0;i--){
+    if(b & (1<<i))printf("1");
+    else printf("0");
+  }
+}
+
+void printMemoria(u_int8_t *arr){
+    for(int i = 0; i<ARRAY_SIZE/4; i++)
+        print_byte(arr[i]);
+}
+
 
 static void on_submit_button_clicked(GtkButton *button, gpointer user_data) {
 
@@ -77,23 +89,10 @@ static void on_submit_button_clicked(GtkButton *button, gpointer user_data) {
 }
 
 
-void printProcessBanner() {
-    // Cada linha termina com \n e precisa manter a mesma formatação
-    // do ASCII que você forneceu.
-    printf("______                                     ___  ___                                        \n");
-    printf("| ___ \\                                    |  \\/  |                                        \n");
-    printf("| |_/ / _ __   ___    ___   ___  ___  ___  | .  . |  __ _  _ __    __ _   __ _   ___  _ __ \n");
-    printf("|  __/ | '__| / _ \\  / __| / _ \\/ __|/ __| | |\\/| | / _` || '_ \\  / _` | / _` | / _ \\| '__|\n");
-    printf("| |    | |   | (_) || (__ |  __/\\__ \\\\__ \\ | |  | || (_| || | | || (_| || (_| ||  __/| |   \n");
-    printf("\\_|    |_|    \\___/  \\___| \\___||___/|___/ \\_|  |_/ \\__,_||_| |_| \\__,_| \\__, | \\___||_|   \n");
-    printf("                                                                          __/ |               \n");
-    printf("                                                                         |___/                \n");
-}
+
 
 // Função do botão para execução passo a passo
-static void on_step_button_clicked(GtkButton *button, gpointer user_data){
-  system("clear");
-  printProcessBanner();                                                             
+static void on_step_button_clicked(GtkButton *button, gpointer user_data){                                                             
   pthread_mutex_lock(&step_mutex);
   pthread_cond_signal(&step_cond);
   pthread_mutex_unlock(&step_mutex);
@@ -109,6 +108,15 @@ void on_checkbutton_toggled(GtkToggleButton *button, gpointer data) {
   }
   pthread_cond_signal(&step_cond);
   pthread_mutex_unlock(&step_mutex);
+}
+
+static void on_show_memory_button_clicked(GtkButton *button, gpointer user_data){
+  AppData *appData = (AppData*)user_data;
+  SO* so = appData->so;
+  pthread_mutex_lock(&step_mutex);
+  printMemoria(so->RAM);
+  pthread_mutex_unlock(&step_mutex);
+
 }
 
 
@@ -145,6 +153,8 @@ static void activate (GtkApplication *app, gpointer user_data){
   GtkWidget *button_step = gtk_button_new_with_label("Clock");
   GtkWidget *check_step = gtk_toggle_button_new_with_label("Execução passo a passo");
 
+  GtkWidget *button_show_memory = gtk_button_new_with_label("Exibir memória");
+
   GtkEntry **entries = g_malloc(sizeof(GtkEntry *) * 4);
   entries[0] = GTK_ENTRY(entry_tamanho);
   entries[1] = GTK_ENTRY(entry_fase1);
@@ -157,6 +167,9 @@ static void activate (GtkApplication *app, gpointer user_data){
   g_signal_connect(button_submit, "clicked", G_CALLBACK(on_submit_button_clicked), submit_data);
   g_signal_connect(button_step, "clicked", G_CALLBACK(on_step_button_clicked), NULL);
   g_signal_connect(check_step, "toggled", G_CALLBACK(on_checkbutton_toggled), NULL);
+
+  g_signal_connect(button_show_memory, "clicked", G_CALLBACK(on_show_memory_button_clicked), user_data);
+
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_step), TRUE); // define ativo como o estado inicial
 
   // Adicionando widgets ao grid
@@ -174,7 +187,9 @@ static void activate (GtkApplication *app, gpointer user_data){
 
   gtk_grid_attach(GTK_GRID(grid), button_submit, 0, 4, 2, 1);
   gtk_grid_attach(GTK_GRID(grid), button_step, 0, 5, 2, 1);
-  gtk_grid_attach(GTK_GRID(grid), check_step, 0, 6, 1, 1);
+  gtk_grid_attach(GTK_GRID(grid), button_show_memory, 0, 6, 2, 1);
+  gtk_grid_attach(GTK_GRID(grid), check_step, 0, 7, 1, 1);
+
 
   gtk_window_present (GTK_WINDOW (window));
   g_signal_connect(window, "destroy", G_CALLBACK(g_free), entries);
@@ -232,6 +247,7 @@ void *thread_execucao(void *arg){
 }
 
 int main (int argc, char **argv){
+   
   pthread_t thread_ui, thread_longterm, thread_cpu;
   void *status, *thread_exec;
 

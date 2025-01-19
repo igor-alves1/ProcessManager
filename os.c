@@ -3,12 +3,20 @@
 #include "fila.h"
 #include "os.h"
 
-void print_byte(u_int8_t b){
-  for (int i=7;i >= 0;i--){
-    if(b & (1<<i))printf("1");
-    else printf("0");
-  }
+void printProcessBanner() {
+    // Cada linha termina com \n e precisa manter a mesma formatação
+    // do ASCII que você forneceu.
+    printf("______                                     ___  ___                                        \n");
+    printf("| ___ \\                                    |  \\/  |                                        \n");
+    printf("| |_/ / _ __   ___    ___   ___  ___  ___  | .  . |  __ _  _ __    __ _   __ _   ___  _ __ \n");
+    printf("|  __/ | '__| / _ \\  / __| / _ \\/ __|/ __| | |\\/| | / _` || '_ \\  / _` | / _` | / _ \\| '__|\n");
+    printf("| |    | |   | (_) || (__ |  __/\\__ \\\\__ \\ | |  | || (_| || | | || (_| || (_| ||  __/| |   \n");
+    printf("\\_|    |_|    \\___/  \\___| \\___||___/|___/ \\_|  |_/ \\__,_||_| |_| \\__,_| \\__, | \\___||_|   \n");
+    printf("                                                                          __/ |               \n");
+    printf("                                                                         |___/                \n");
 }
+
+
 
 SO *inicializarSO(){
     SO *so = (SO *)malloc(sizeof(SO));
@@ -60,17 +68,13 @@ void printFila(Fila *f){
         return;
     }
     while(l){
-        Processo *p = (Processo *) l->dado;
-        printf("-> P%d ", p->id);
+        Processo *p = (Processo *) l->dado;   
+        printf("-> P%d (%d) ", p->id, p->faseIO);
         l = l->prox;
     }
     printf("\n");
 }
 
-void printMemoria(u_int8_t *arr){
-    for(int i = 0; i<ARRAY_SIZE/4; i++)
-        print_byte(arr[i]);
-}
 
 // Chamado pelo escalonador de longo prazo
 void admitirProcesso(SO *so){
@@ -204,6 +208,11 @@ void escalonadorCurtoPrazo(SO *so, CPU *cpu){
 }
 
 void clockSO(SO *so){
+    // Limpa a tela e printa o banner
+    fflush(stdout);
+    system("clear");
+    printProcessBanner();
+
     if(!filaVazia(so->bloqueados)){
         Processo *b = (Processo *) peek(so->bloqueados);
         b->faseIO--;
@@ -226,5 +235,5 @@ void clockSO(SO *so){
     printf("Fila de bloqueados: ");
     printFila(so->bloqueados);
     printf("\n");
-    printMemoria(so->RAM);
+    //printMemoria(so->RAM);
 }
