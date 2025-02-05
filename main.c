@@ -4,10 +4,17 @@
 #include <unistd.h>
 #include <gtk/gtk.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include "os.h"
 #include "fila.h"
 #include "TLSE.h"
+
+// Mutex e Condicional para execução passo a passo
+pthread_mutex_t step_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t step_cond = PTHREAD_COND_INITIALIZER;
+
+int isStep = 1;
+
+
 
 typedef struct appdata{
   SO *so;
@@ -19,7 +26,7 @@ typedef struct {
   GtkEntry **entries;
 } SubmitData;
 
-int str_to_int(char *str){
+int str_to_int(const char *str){
   int l = strlen(str);
   int pow = 1, n, result = 0;
 
@@ -33,6 +40,22 @@ int str_to_int(char *str){
 
   return result;
 }
+
+void print_byte(u_int8_t b){
+  for (int i=7;i >= 0;i--){
+    if(b & (1<<i))printf("1");
+    else printf("0");
+  }
+}
+
+void printMemoria(u_int8_t *arr){
+    for(int i = 0; i<ARRAY_SIZE/4; i++)
+        print_byte(arr[i]);
+    printf("\n");
+}
+
+
+
 
 static void on_submit_button_clicked(GtkButton *button, gpointer user_data) {
 
@@ -61,17 +84,47 @@ static void on_submit_button_clicked(GtkButton *button, gpointer user_data) {
   Processo *p = criarProcesso(tam, cpu1, io, cpu2);
 
   // Acesso à região crítica da fila de Novos
-  sem_wait(app_data->so->s_mutex_novos);
   addFila(app_data->so->novos, p);
-  sem_post(app_data->so->s_mutex_novos);
-  sem_post(app_data->so->s_empty_novos);
+  app_data->so->interrupt = 1;
 
-  g_print("#########################\nNovo processo criado!\n");
-  g_print("Tamanho (MB): %d\n", tam);
-  g_print("Fase 1 (CPU): %d\n", cpu1);
-  g_print("Fase de I/O: %d\n", io);
-  g_print("Fase 2 (CPU): %d\n#########################\n", cpu2);
+  printf("#########################\nNovo processo criado!\n");
+  printf("Tamanho (MB): %d\n", tam);
+  printf("Fase 1 (CPU): %d\n", cpu1);
+  printf("Fase de I/O: %d\n", io);
+  printf("Fase 2 (CPU): %d\n#########################\n", cpu2);
 }
+
+
+
+
+// Função do botão para execução passo a passo
+static void on_step_button_clicked(GtkButton *button, gpointer user_data){                                                             
+  pthread_mutex_lock(&step_mutex);
+  pthread_cond_signal(&step_cond);
+  pthread_mutex_unlock(&step_mutex);
+  
+}
+
+void on_checkbutton_toggled(GtkToggleButton *button, gpointer data) {
+  pthread_mutex_lock(&step_mutex);
+  if (gtk_toggle_button_get_active(button)) {
+      isStep = 1;
+  } else {
+      isStep = 0;
+  }
+  pthread_cond_signal(&step_cond);
+  pthread_mutex_unlock(&step_mutex);
+}
+
+static void on_show_memory_button_clicked(GtkButton *button, gpointer user_data){
+    AppData *appData = (AppData*)user_data;
+    SO* so = appData->so;
+    pthread_mutex_lock(&step_mutex);
+    printMemoria(so->RAM);
+    pthread_mutex_unlock(&step_mutex);
+
+}
+
 
 static void activate (GtkApplication *app, gpointer user_data){
   GtkWidget *window;
@@ -103,6 +156,11 @@ static void activate (GtkApplication *app, gpointer user_data){
   GtkWidget *entry_fase2 = gtk_entry_new();
 
   GtkWidget *button_submit = gtk_button_new_with_label("Enviar");
+  GtkWidget *button_step = gtk_button_new_with_label("Clock");
+  GtkWidget *check_step = gtk_toggle_button_new_with_label("Execução passo a passo");
+
+  GtkWidget *button_show_memory = gtk_button_new_with_label("Exibir memória");
+
   GtkEntry **entries = g_malloc(sizeof(GtkEntry *) * 4);
   entries[0] = GTK_ENTRY(entry_tamanho);
   entries[1] = GTK_ENTRY(entry_fase1);
@@ -113,6 +171,12 @@ static void activate (GtkApplication *app, gpointer user_data){
   submit_data->entries = entries;
 
   g_signal_connect(button_submit, "clicked", G_CALLBACK(on_submit_button_clicked), submit_data);
+  g_signal_connect(button_step, "clicked", G_CALLBACK(on_step_button_clicked), NULL);
+  g_signal_connect(check_step, "toggled", G_CALLBACK(on_checkbutton_toggled), NULL);
+
+  g_signal_connect(button_show_memory, "clicked", G_CALLBACK(on_show_memory_button_clicked), user_data);
+
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_step), TRUE); // define ativo como o estado inicial
 
   // Adicionando widgets ao grid
   gtk_grid_attach(GTK_GRID(grid), label_tamanho, 0, 0, 1, 1);
@@ -128,6 +192,10 @@ static void activate (GtkApplication *app, gpointer user_data){
   gtk_grid_attach(GTK_GRID(grid), entry_fase2, 1, 3, 1, 1);
 
   gtk_grid_attach(GTK_GRID(grid), button_submit, 0, 4, 2, 1);
+  gtk_grid_attach(GTK_GRID(grid), button_step, 0, 5, 2, 1);
+  gtk_grid_attach(GTK_GRID(grid), button_show_memory, 0, 6, 2, 1);
+  gtk_grid_attach(GTK_GRID(grid), check_step, 0, 7, 1, 1);
+
 
   gtk_window_present (GTK_WINDOW (window));
   g_signal_connect(window, "destroy", G_CALLBACK(g_free), entries);
@@ -150,11 +218,15 @@ void *thread_LongoPrazo(void *arg){
 
   int i = 0;
   while(data->app){
-    if(memoriaDisponivel(so)){
-      sem_wait(so->s_empty_novos);
-      sem_wait(so->s_mutex_novos);
+    while(!so->interrupt);
+    so->interrupt = 0;
+    if(filaVazia(so->novos)) continue;
+    int x = memoriaDisponivel(so);
+    if (x) {
+      printf("Memoria disponivel, alocando processo...\n");
       escalonadorLongoPrazo(so);
-      sem_post(so->s_mutex_novos);
+    } else{
+      printf("Memória indisponível, aguardando...\n");
     }
   }
   pthread_exit(NULL);
@@ -167,13 +239,21 @@ void *thread_execucao(void *arg){
 
   sleep(5);
   while(data->app){
-    sleep(3);
-    clockSO(so);
+    if(isStep){
+      pthread_mutex_lock(&step_mutex);
+      pthread_cond_wait(&step_cond, &step_mutex);
+      clockSO(so);
+      pthread_mutex_unlock(&step_mutex);
+    }else{
+      sleep(3);
+      clockSO(so);
+    }
   }
   pthread_exit(NULL);
 }
 
 int main (int argc, char **argv){
+   
   pthread_t thread_ui, thread_longterm, thread_cpu;
   void *status, *thread_exec;
 
@@ -188,6 +268,10 @@ int main (int argc, char **argv){
   pthread_join(thread_ui, &status);
   pthread_join(thread_longterm, &thread_exec);
   pthread_join(thread_cpu, &thread_exec);
+
+  // Libera o mutex e a condicional corretamente
+  pthread_mutex_destroy(&step_mutex);
+  pthread_cond_destroy(&step_cond);
 
   int *stat = (int *)status;
   int res = *stat;
